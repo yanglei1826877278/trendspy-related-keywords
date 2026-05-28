@@ -212,6 +212,25 @@ def push_results_to_api(payload):
         logging.error(f"Push API failed: {str(e)}")
         return None
 
+def push_batch_results_to_api(batch_results, batch_failures, run_date, timeframe, started_at, finished_at, batch_number, total_batches):
+    """Push one processed keyword batch to the configured Java API."""
+    payload = build_push_payload(
+        batch_results,
+        run_date=run_date,
+        timeframe=timeframe,
+        started_at=started_at,
+        finished_at=finished_at,
+        failures=batch_failures
+    )
+    logging.info(
+        "Pushing trends batch %s/%s: %s success keywords, %s failures",
+        batch_number,
+        total_batches,
+        len(batch_results),
+        len(batch_failures)
+    )
+    return push_results_to_api(payload)
+
 def get_date_range_timeframe(timeframe):
     """Convert special timeframe formats to date range format
     
@@ -298,8 +317,13 @@ def process_trends():
         failures = []
         failed_keywords = set()
         
+        batch_size = RATE_LIMIT_CONFIG['batch_size']
+        total_batches = (len(KEYWORDS) + batch_size - 1) // batch_size
+
         # 将关键词分批处理，使用实际的 timeframe
-        for i in range(0, len(KEYWORDS), RATE_LIMIT_CONFIG['batch_size']):
+        for i in range(0, len(KEYWORDS), batch_size):
+            batch_number = i // batch_size + 1
+            batch_started_at = datetime.now()
             keywords_batch = KEYWORDS[i:i + RATE_LIMIT_CONFIG['batch_size']]
             # 传递实际的 timeframe 到查询函数
             success = process_keywords_batch(
@@ -309,36 +333,57 @@ def process_trends():
                 high_rising_trends,
                 actual_timeframe
             )
+            batch_finished_at = datetime.now()
             
             if not success:
                 logging.error(f"Failed to process batch starting with keyword: {keywords_batch[0]}")
                 failed_keywords.update(keywords_batch)
-                failures.extend([
+                batch_failures = [
                     {'keyword': keyword, 'error': 'batch processing failed'}
                     for keyword in keywords_batch
-                ])
+                ]
+                failures.extend(batch_failures)
+                push_batch_results_to_api(
+                    {},
+                    batch_failures,
+                    run_date=started_at.date(),
+                    timeframe=actual_timeframe,
+                    started_at=batch_started_at,
+                    finished_at=batch_finished_at,
+                    batch_number=batch_number,
+                    total_batches=total_batches
+                )
                 continue
+
+            batch_results = {
+                keyword: all_results[keyword]
+                for keyword in keywords_batch
+                if keyword in all_results
+            }
+            batch_failures = [
+                {'keyword': keyword, 'error': 'no data returned'}
+                for keyword in keywords_batch
+                if keyword not in batch_results
+            ]
+            if batch_failures:
+                failed_keywords.update(item['keyword'] for item in batch_failures)
+                failures.extend(batch_failures)
+            push_batch_results_to_api(
+                batch_results,
+                batch_failures,
+                run_date=started_at.date(),
+                timeframe=actual_timeframe,
+                started_at=batch_started_at,
+                finished_at=batch_finished_at,
+                batch_number=batch_number,
+                total_batches=total_batches
+            )
             
             # 如果不是最后一批，等待一段时间再处理下一批
-            if i + RATE_LIMIT_CONFIG['batch_size'] < len(KEYWORDS):
+            if i + batch_size < len(KEYWORDS):
                 wait_time = RATE_LIMIT_CONFIG['batch_interval'] + random.uniform(0, 60)
                 logging.info(f"Waiting {wait_time:.1f} seconds before processing next batch...")
                 time.sleep(wait_time)
-
-        for keyword in KEYWORDS:
-            if keyword not in all_results and keyword not in failed_keywords:
-                failures.append({'keyword': keyword, 'error': 'no data returned'})
-
-        finished_at = datetime.now()
-        payload = build_push_payload(
-            all_results,
-            run_date=started_at.date(),
-            timeframe=actual_timeframe,
-            started_at=started_at,
-            finished_at=finished_at,
-            failures=failures
-        )
-        push_results_to_api(payload)
 
         # Generate and send daily report
         report_file = generate_daily_report(all_results, directory)
