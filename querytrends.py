@@ -12,8 +12,14 @@ def get_related_queries(keyword, geo='', timeframe='today 12-m'):
     """
     获取关键词的相关查询数据，带请求限制
     """
+    # 代理配置（如需使用代理，取消注释并修改）
+    proxies = {
+         'http': 'http://127.0.0.1:7890',
+         'https': 'http://127.0.0.1:7890',
+    }
+
     while True:  # 添加无限重试循环
-        tr = Trends(hl='zh-CN')
+        tr = Trends(hl='zh-CN', proxies=proxies if proxies else None)
         
         # 随机化 User-Agent
         user_agents = [

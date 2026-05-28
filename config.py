@@ -8,6 +8,14 @@ load_dotenv()
 NOTIFICATION_CONFIG = {
     'method': 'email',  # 可选值: 'email', 'wechat', 'both'
     'wechat_receiver': os.getenv('TRENDS_WECHAT_RECEIVER', ''),  # 微信接收者的备注名或微信号
+    'email_enabled': os.getenv('PUSH_EMAIL_ENABLED', 'True').lower() == 'true',
+}
+
+# Push API Configuration
+PUSH_API_CONFIG = {
+    'enabled': os.getenv('PUSH_API_ENABLED', 'False').lower() == 'true',
+    'url': os.getenv('PUSH_API_URL', ''),
+    'api_key': os.getenv('PUSH_API_KEY', ''),
 }
 
 # Email Configuration

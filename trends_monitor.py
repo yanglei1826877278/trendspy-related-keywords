@@ -1,9 +1,15 @@
 import os
+import smtplib
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 import pandas as pd
 from datetime import datetime, timedelta
 import schedule
 import time
 import random
+import requests
 from querytrends import batch_get_queries, save_related_queries, RequestLimiter
 import json
 import logging
@@ -18,7 +24,8 @@ from config import (
     LOGGING_CONFIG,
     STORAGE_CONFIG,
     TRENDS_CONFIG,
-    NOTIFICATION_CONFIG
+    NOTIFICATION_CONFIG,
+    PUSH_API_CONFIG
 )
 from notification import NotificationManager
 
@@ -127,6 +134,84 @@ def generate_daily_report(results, directory):
         return report_file
     return None
 
+def dataframe_to_query_items(df):
+    """Convert a trendspy DataFrame to API query items."""
+    if not isinstance(df, pd.DataFrame):
+        return []
+
+    items = []
+    for _, row in df.iterrows():
+        query = row.get('query')
+        if pd.isna(query) or not str(query).strip():
+            continue
+
+        value = row.get('value')
+        if pd.isna(value):
+            value = None
+        else:
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                value = None
+
+        items.append({
+            'query': str(query).strip(),
+            'value': value
+        })
+    return items
+
+def build_push_payload(results, run_date, timeframe, started_at, finished_at, failures=None):
+    """Build payload accepted by /api/google-trends/push."""
+    items = []
+    for keyword, data in results.items():
+        if not data:
+            continue
+        items.append({
+            'keyword': keyword,
+            'timestamp': finished_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'related_queries': {
+                'top': dataframe_to_query_items(data.get('top')),
+                'rising': dataframe_to_query_items(data.get('rising'))
+            }
+        })
+
+    return {
+        'runDate': run_date.strftime('%Y-%m-%d'),
+        'timeframe': timeframe,
+        'geo': TRENDS_CONFIG['geo'],
+        'hl': 'zh-CN',
+        'startedAt': started_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'finishedAt': finished_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'items': items,
+        'failures': failures or []
+    }
+
+def push_results_to_api(payload):
+    """Push collected trends to the configured Java API."""
+    if not PUSH_API_CONFIG.get('enabled'):
+        logging.info("Push API disabled, skipping push")
+        return None
+
+    api_url = PUSH_API_CONFIG.get('url')
+    if not api_url:
+        logging.warning("Push API enabled but PUSH_API_URL is empty, skipping push")
+        return None
+
+    headers = {'Content-Type': 'application/json'}
+    api_key = PUSH_API_CONFIG.get('api_key')
+    if api_key:
+        headers['X-Open-Api-Key'] = api_key
+
+    try:
+        response = requests.post(api_url, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        logging.info(f"Push API success: {result}")
+        return result
+    except Exception as e:
+        logging.error(f"Push API failed: {str(e)}")
+        return None
+
 def get_date_range_timeframe(timeframe):
     """Convert special timeframe formats to date range format
     
@@ -197,6 +282,7 @@ def get_trends_with_retry(keywords_batch, timeframe):
 
 def process_trends():
     """Main function to process trends data"""
+    started_at = datetime.now()
     try:
         logging.info("Starting daily trends processing")
         
@@ -209,6 +295,8 @@ def process_trends():
         
         all_results = {}
         high_rising_trends = []
+        failures = []
+        failed_keywords = set()
         
         # 将关键词分批处理，使用实际的 timeframe
         for i in range(0, len(KEYWORDS), RATE_LIMIT_CONFIG['batch_size']):
@@ -224,6 +312,11 @@ def process_trends():
             
             if not success:
                 logging.error(f"Failed to process batch starting with keyword: {keywords_batch[0]}")
+                failed_keywords.update(keywords_batch)
+                failures.extend([
+                    {'keyword': keyword, 'error': 'batch processing failed'}
+                    for keyword in keywords_batch
+                ])
                 continue
             
             # 如果不是最后一批，等待一段时间再处理下一批
@@ -231,6 +324,21 @@ def process_trends():
                 wait_time = RATE_LIMIT_CONFIG['batch_interval'] + random.uniform(0, 60)
                 logging.info(f"Waiting {wait_time:.1f} seconds before processing next batch...")
                 time.sleep(wait_time)
+
+        for keyword in KEYWORDS:
+            if keyword not in all_results and keyword not in failed_keywords:
+                failures.append({'keyword': keyword, 'error': 'no data returned'})
+
+        finished_at = datetime.now()
+        payload = build_push_payload(
+            all_results,
+            run_date=started_at.date(),
+            timeframe=actual_timeframe,
+            started_at=started_at,
+            finished_at=finished_at,
+            failures=failures
+        )
+        push_results_to_api(payload)
 
         # Generate and send daily report
         report_file = generate_daily_report(all_results, directory)
@@ -364,7 +472,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # 检查邮件配置
-    if not all([
+    if NOTIFICATION_CONFIG.get('email_enabled', True) and not all([
         EMAIL_CONFIG['sender_email'],
         EMAIL_CONFIG['sender_password'],
         EMAIL_CONFIG['recipient_email']

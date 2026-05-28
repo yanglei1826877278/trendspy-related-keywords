@@ -23,8 +23,11 @@ class NotificationManager:
         success = True
 
         if method in ['email', 'both']:
-            email_success = self._send_email(subject, body, attachments)
-            success = success and email_success
+            if NOTIFICATION_CONFIG.get('email_enabled', True):
+                email_success = self._send_email(subject, body, attachments)
+                success = success and email_success
+            else:
+                logging.info("Email notification disabled, skipping email")
 
         if method in ['wechat', 'both']:
             wechat_success = self._send_wechat(subject, body, attachments)
