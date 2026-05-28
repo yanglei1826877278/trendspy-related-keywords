@@ -29,13 +29,69 @@ EMAIL_CONFIG = {
 
 # Keywords to monitor
 KEYWORDS = [
-   
+    "Generator",
+    "Maker",
+    "Creator",
+    "Builder",
+    "Designer",
+    "Writer",
+
     "Image",
+    "Photo",
+    "Picture",
     "Video",
-    "Music",
+    "Audio",
     "Voice",
-    "Text",
-    # Add more keywords as needed
+    "Sound",
+    "Speech",
+    "Song",
+    "Music",
+
+    "Avatar",
+    "Anime",
+    "Portrait",
+    "Logo",
+    "Icon",
+    "Tattoo",
+    "Character",
+    "Coloring Page",
+    "Product Photo",
+    "Cartoon",
+    "Illustration",
+    "Interior Design",
+
+    "Upscaler",
+    "Enhancer",
+    "Humanizer",
+    "Detector",
+    "Checker",
+    "Summarizer",
+    "Transcriber",
+    "Paraphraser",
+    "Translator",
+    "Converter",
+
+    "Scraper",
+    "Crawler",
+    "Downloader",
+    "Extractor",
+
+    "Code",
+    "Chat",
+    "Meme",
+    "Emoji",
+    "Filter",
+    "Style",
+    "Face",
+    "Diagram",
+    "Font",
+    "Modifier",
+    "Fixer",
+    "Corrector",
+
+    "AI",
+    "ChatGPT",
+    "Python",
 ]
 
 
