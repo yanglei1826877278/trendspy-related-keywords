@@ -87,11 +87,7 @@ KEYWORDS = [
     "Font",
     "Modifier",
     "Fixer",
-    "Corrector",
-
-    "AI",
-    "ChatGPT",
-    "Python",
+    "Corrector"
 ]
 
 
