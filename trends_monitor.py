@@ -236,28 +236,28 @@ def process_trends():
         report_file = generate_daily_report(all_results, directory)
         if report_file:
             report_body = """
-            <h2>Daily Trends Report</h2>
-            <p>Please find attached the daily trends report.</p>
-            <p>Query Parameters:</p>
+            <h2>每日趋势报告</h2>
+            <p>请查收附件中的每日趋势报告。</p>
+            <p>查询参数：</p>
             <ul>
-            <li>Time Range: {}</li>
-            <li>Region: {}</li>
+            <li>时间范围：{}</li>
+            <li>地区：{}</li>
             </ul>
-            <p>Summary:</p>
+            <p>汇总：</p>
             <ul>
-            <li>Total keywords processed: {}</li>
-            <li>Successful queries: {}</li>
-            <li>Failed queries: {}</li>
+            <li>处理关键词总数：{}</li>
+            <li>成功查询：{}</li>
+            <li>失败查询：{}</li>
             </ul>
             """.format(
                 TRENDS_CONFIG['timeframe'],
-                TRENDS_CONFIG['geo'] or 'Global',
+                TRENDS_CONFIG['geo'] or '全球',
                 len(KEYWORDS),
                 len(all_results),
                 len(KEYWORDS) - len(all_results)
             )
             if not notification_manager.send_notification(
-                subject=f"Daily Trends Report - {datetime.now().strftime('%Y-%m-%d')}",
+                subject=f"每日趋势报告 - {datetime.now().strftime('%Y-%m-%d')}",
                 body=report_body,
                 attachments=[report_file]
             ):
@@ -273,19 +273,19 @@ def process_trends():
                 total_batches = (len(high_rising_trends) + batch_size - 1) // batch_size
                 
                 alert_body = f"""
-                <h2>📊 High Rising Trends Alert</h2>
+                <h2>📊 高增长趋势预警</h2>
                 <hr>
-                <h3>📌 Query Parameters:</h3>
+                <h3>📌 查询参数：</h3>
                 <ul>
-                    <li>🕒 Time Range: {TRENDS_CONFIG['timeframe']}</li>
-                    <li>🌍 Region: {TRENDS_CONFIG['geo'] or 'Global'}</li>
+                    <li>🕒 时间范围：{TRENDS_CONFIG['timeframe']}</li>
+                    <li>🌍 地区：{TRENDS_CONFIG['geo'] or '全球'}</li>
                 </ul>
-                <h3>📈 Significant Growth Trends:</h3>
+                <h3>📈 显著增长趋势：</h3>
                 <table border="1" cellpadding="5" style="border-collapse: collapse;">
                     <tr>
-                        <th>🔍 Base Keyword</th>
-                        <th>🔗 Related Query</th>
-                        <th>📈 Growth</th>
+                        <th>🔍 基础关键词</th>
+                        <th>🔗 相关查询</th>
+                        <th>📈 增长</th>
                     </tr>
                 """
                 
@@ -301,7 +301,7 @@ def process_trends():
                 alert_body += "</table>"
                 
                 if batch_number < total_batches:
-                    alert_body += f"<p><i>This is batch {batch_number} of {total_batches}. More results will follow.</i></p>"
+                    alert_body += f"<p><i>这是第 {batch_number}/{total_batches} 批结果。更多结果将在后续发送。</i></p>"
                 
                 if not notification_manager.send_notification(
                     subject=f"📊 Rising Trends Alert ({batch_number}/{total_batches})",
@@ -317,8 +317,8 @@ def process_trends():
     except Exception as e:
         logging.error(f"Error in trends processing: {str(e)}")
         notification_manager.send_notification(
-            subject="❌ Error in Trends Processing",
-            body=f"<p>An error occurred during trends processing:</p><pre>{str(e)}</pre>"
+            subject="❌ 趋势处理发生错误",
+            body=f"<p>趋势处理过程中发生错误：</p><pre>{str(e)}</pre>"
         )
         return False
 

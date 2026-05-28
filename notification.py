@@ -53,16 +53,16 @@ class NotificationManager:
                 server.ehlo()
                 server.starttls()
                 server.ehlo()
-                logging.info("Attempting to login to Gmail...")
+                logging.info("正在登录邮箱...")
                 server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
-                logging.info("Login successful, sending email...")
+                logging.info("登录成功，正在发送邮件...")
                 server.send_message(msg)
-                
-            logging.info(f"Email sent successfully: {subject}")
+    
+            logging.info(f"邮件发送成功: {subject}")
             return True
         except Exception as e:
-            logging.error(f"Failed to send email: {str(e)}")
-            logging.error(f"Email configuration used: server={EMAIL_CONFIG['smtp_server']}, port={EMAIL_CONFIG['smtp_port']}")
+            logging.error(f"邮件发送失败: {str(e)}")
+            logging.error(f"邮件配置: server={EMAIL_CONFIG['smtp_server']}, port={EMAIL_CONFIG['smtp_port']}")
             return False
 
     def _format_wechat_message(self, subject, body, report_data=None):
